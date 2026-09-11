@@ -4,7 +4,7 @@ Use a dedicated account portfolio. Stonkfly is an experiment capable of losing i
 
 ## Installation and data
 
-Use Python 3.11 and a C++17 compiler (`clang++`/`c++` on macOS, GCC or Clang on Linux). `python -m stonkfly prepare` downloads about 1.1 GB of upstream data, verifies it, and builds the full graph. Allow several additional GB for dependencies, derived data and two checkpoints. `python -m stonkfly verify` independently checks prepared inputs. Set `STONKFLY_DATA` to use another data location.
+Use Python 3.11 and a C++17 compiler. macOS uses `clang++`/`c++`, Linux uses `clang++`, `c++`, or `g++`, and Windows uses LLVM/MinGW (`clang++` or `g++`) or MSVC (`cl.exe`). The compiler must be available on `PATH`; a Visual Studio Developer Command Prompt is required for `cl.exe`. `python -m stonkfly prepare` downloads about 1.1 GB of upstream data, verifies it, and builds the full graph. Allow several additional GB for dependencies, derived data and two checkpoints. `python -m stonkfly verify` independently checks prepared inputs. Set `STONKFLY_DATA` to use another data location.
 
 Existing DOOMFLY researchers can reuse verified local files with `python -m stonkfly prepare --reuse-doomfly /path/to/working-copy`. Stonkfly copies only the three required data artifacts, then checks the same locks. It does not import a Doom environment, run its website, or depend on that checkout afterward.
 

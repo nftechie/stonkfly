@@ -10,7 +10,7 @@ Positive portfolio P&L stimulates 15 identified PAM11 dopamine cells; negative P
 
 ## Run it
 
-Python 3.11, a C++17 compiler, macOS/Linux. Allow several GB for the dataset and dependencies; 16 GB RAM recommended.
+Python 3.11 and a C++17 compiler on macOS, Linux, or Windows. Allow several GB for the dataset and dependencies; 16 GB RAM recommended.
 
 ```sh
 python3.11 -m venv .venv
@@ -19,6 +19,35 @@ pip install -e '.[test]'
 python -m stonkfly prepare
 python -m stonkfly run
 ```
+
+### Windows with MSYS2
+
+Install the UCRT64 C++ compiler from an **MSYS2 UCRT64** terminal:
+
+```sh
+pacman -Syu
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc
+```
+
+In the VS Code PowerShell terminal, make the compiler available before running Stonkfly:
+
+```powershell
+$env:Path = "C:\msys64\ucrt64\bin;$env:Path"
+g++ --version
+```
+
+To add it permanently to your user `PATH` from PowerShell:
+
+```powershell
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+[Environment]::SetEnvironmentVariable(
+	"Path",
+	"C:\msys64\ucrt64\bin;$userPath",
+	"User"
+)
+```
+
+Restart VS Code after changing the permanent Windows `PATH`. The build detects `g++` and creates `memory.dll` automatically.
 
 Default: **paper trades, real public BTC-USDC data, $100 simulated balance**. No key needed. Local logs, sensory images and resumable brain state go in `runs/paper/`. Ctrl-C stops it; the same command resumes.
 

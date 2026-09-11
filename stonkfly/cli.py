@@ -2,7 +2,6 @@
 
 import argparse
 import dataclasses
-import fcntl
 import hashlib
 import json
 import os
@@ -12,6 +11,58 @@ import traceback
 from pathlib import Path
 
 from .config import D, Settings
+
+
+def _acquire_worker_lock(path):
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateFileW.argtypes = [
+            wintypes.LPCWSTR,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.LPVOID,
+            wintypes.DWORD,
+            wintypes.DWORD,
+            wintypes.HANDLE,
+        ]
+        kernel32.CreateFileW.restype = wintypes.HANDLE
+        handle = kernel32.CreateFileW(
+            str(path),
+            0x80000000 | 0x40000000,  # GENERIC_READ | GENERIC_WRITE
+            0,  # No sharing: only one worker may own this file.
+            None,
+            4,  # OPEN_ALWAYS
+            0x80,  # FILE_ATTRIBUTE_NORMAL
+            None,
+        )
+        if handle == wintypes.HANDLE(-1).value:
+            error = ctypes.get_last_error()
+            if error in (32, 33):  # ERROR_SHARING_VIOLATION/LOCK_VIOLATION
+                raise BlockingIOError(error, "Worker lock is already held")
+            raise ctypes.WinError(error)
+        return handle
+
+    import fcntl
+
+    lock = path.open("a")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except Exception:
+        lock.close()
+        raise
+    return lock
+
+
+def _release_worker_lock(lock):
+    if os.name == "nt":
+        import ctypes
+
+        ctypes.WinDLL("kernel32").CloseHandle(lock)
+    else:
+        lock.close()
 
 
 def main():
@@ -106,9 +157,8 @@ def main():
     )
     out = a.out or Path("runs/live" if a.live else "runs/paper")
     out.mkdir(parents=True, exist_ok=True)
-    lock = (out / "worker.lock").open("a")
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock = _acquire_worker_lock(out / "worker.lock")
     except BlockingIOError:
         raise SystemExit("A worker already owns this run directory")
     from .broker import CoinbaseBroker, PaperBroker
@@ -197,7 +247,11 @@ def main():
         count = 0
         while not a.steps or count < a.steps:
             started = time.monotonic()
-            if (out / "STOP").exists() or ledger.get("halted"):
+            stop_requested = (out / "STOP").exists()
+            halted = ledger.get("halted")
+            if stop_requested or halted:
+                reason = "STOP file exists" if stop_requested else f"run is halted: {halted}"
+                print(f"Run stopped before tick: {reason}", file=sys.stderr, flush=True)
                 break
             broker.reconcile()
             broker.verify_balances()
@@ -305,7 +359,7 @@ def main():
         raise SystemExit(1) from None
     finally:
         ledger.close()
-        lock.close()
+        _release_worker_lock(lock)
 
 
 if __name__ == "__main__":

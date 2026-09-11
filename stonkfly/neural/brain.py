@@ -4,6 +4,8 @@ import ctypes as C
 import hashlib
 import json
 import math
+import os
+import shutil
 import subprocess
 import sys
 import time
@@ -16,9 +18,10 @@ from .common import DATA, GRAPH, OUT, digest, save_json
 from .state import NativeBrain
 
 SOURCE = Path(__file__).with_name("kernel.cpp")
-LIBRARY = (OUT / "physiology-v6") / (
-    "libmemory.dylib" if sys.platform == "darwin" else "libmemory.so"
-)
+LIBRARY = (OUT / "physiology-v6") / {
+    "darwin": "libmemory.dylib",
+    "win32": "memory.dll",
+}.get(sys.platform, "libmemory.so")
 MODEL = "stonkfly-dual-compartment-v1"
 from .rule import PARAMETERS as RULE_PARAMETERS
 
@@ -46,16 +49,47 @@ def build():
             return record
     LIBRARY.parent.mkdir(parents=True, exist_ok=True)
     temp = LIBRARY.with_suffix(LIBRARY.suffix + ".partial")
-    subprocess.run(
-        ["c++", "-O3", "-std=c++17", "-shared", "-fPIC", str(SOURCE), "-o", str(temp)],
-        check=True,
+    compiler = next(
+        (
+            candidate
+            for candidate in (["clang++", "g++", "c++", "cl"] if os.name == "nt" else ["clang++", "c++", "g++"])
+            if shutil.which(candidate)
+        ),
+        None,
     )
+    if compiler is None:
+        raise RuntimeError(
+            "No C++17 compiler found. Install LLVM/Clang or MinGW on Windows "
+            "and ensure clang++ or g++ is on PATH."
+        )
+    if Path(compiler).name.lower() == "cl.exe":
+        command = [
+            compiler,
+            "/O2",
+            "/std:c++17",
+            "/LD",
+            str(SOURCE),
+            f"/Fe:{temp}",
+        ]
+    else:
+        command = [
+            compiler,
+            "-O3",
+            "-std=c++17",
+            "-shared",
+            *([] if os.name == "nt" else ["-fPIC"]),
+            str(SOURCE),
+            "-o",
+            str(temp),
+        ]
+    subprocess.run(command, check=True)
     temp.replace(LIBRARY)
     record = {
         "model": MODEL,
         "source_sha256": sha,
         "binary_sha256": hashlib.sha256(LIBRARY.read_bytes()).hexdigest(),
-        "flags": ["-O3", "-std=c++17", "-shared", "-fPIC"],
+        "compiler": compiler,
+        "command": command,
     }
     save_json(metadata, record)
     return record
