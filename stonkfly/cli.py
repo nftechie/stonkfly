@@ -275,8 +275,11 @@ def main():
             count += 1
             if not a.fast and (not a.steps or count < a.steps):
                 until = started + settings.interval_seconds
-                while time.monotonic() < until and not (out / "STOP").exists():
-                    time.sleep(min(1, until - time.monotonic()))
+                while not (out / "STOP").exists():
+                    remaining = until - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    time.sleep(min(1, remaining))
     except KeyboardInterrupt:
         print("Stopped; run state preserved.", flush=True)
     except Exception as e:
