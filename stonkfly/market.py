@@ -143,6 +143,10 @@ class FixtureMarket:
         self.tick = 0
         self.history = {p: [] for p in products}
 
+    def record(self, quotes):
+        CoinbaseMarket.record(self, quotes)
+        self.tick += 1
+
     def snapshot(self):
         base = {"BTC-USDC": 60000, "ETH-USDC": 2500, "SOL-USDC": 100}
         quotes = {}
@@ -164,7 +168,4 @@ class FixtureMarket:
                     float(D(base[p]) * D(1 + 0.01 * math.sin(i * 0.4 + j)))
                     for i in range(80)
                 ]
-        self.tick += 1
         return quotes
-
-    record = CoinbaseMarket.record

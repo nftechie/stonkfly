@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from stonkfly.display import market_frame
-from stonkfly.market import CoinbaseMarket, utc_timestamp
+from stonkfly.market import CoinbaseMarket, FixtureMarket, utc_timestamp
 
 
 class PublicSDK:
@@ -58,6 +58,18 @@ def test_explicit_timestamp_zone():
     with pytest.raises(ValueError):
         utc_timestamp("2026-01-01T00:00:00")
     assert utc_timestamp("2026-01-01T00:00:00Z") == 1767225600
+
+
+def test_fixture_observation_clock_does_not_skip_on_execution_refresh():
+    m = FixtureMarket(("BTC-USDC",))
+    first = m.snapshot()
+    assert m.tick == 0
+    m.record(first)
+    assert m.tick == 1
+    m.snapshot()  # Execution quote refresh must not advance fixture phase.
+    assert m.tick == 1
+    m.record(m.snapshot())
+    assert m.tick == 2
 
 
 def test_public_client_cannot_inherit_credentials(monkeypatch):
