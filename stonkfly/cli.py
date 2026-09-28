@@ -14,6 +14,14 @@ from pathlib import Path
 from .config import D, Settings
 
 
+def wait_interval(started, interval_seconds, stop_file, fast):
+    if fast:
+        return
+    until = started + interval_seconds
+    while time.monotonic() < until and not stop_file.exists():
+        time.sleep(min(1, until - time.monotonic()))
+
+
 def main():
     p = argparse.ArgumentParser(prog="stonkfly")
     sub = p.add_subparsers(dest="command", required=True)
@@ -202,7 +210,14 @@ def main():
             broker.reconcile()
             broker.verify_balances()
             quotes = market.snapshot()
-            guard.check(quotes, time.time())
+            try:
+                guard.check(quotes, time.time())
+            except Veto:
+                # Spread/stale quotes are not a worker halt; skip neural+trade.
+                wait_interval(
+                    started, settings.interval_seconds, out / "STOP", a.fast
+                )
+                continue
             market.record(quotes)
             product = settings.products[ledger.get("tick") % len(settings.products)]
             q = quotes[product]
@@ -273,10 +288,10 @@ def main():
                 flush=True,
             )
             count += 1
-            if not a.fast and (not a.steps or count < a.steps):
-                until = started + settings.interval_seconds
-                while time.monotonic() < until and not (out / "STOP").exists():
-                    time.sleep(min(1, until - time.monotonic()))
+            if not a.steps or count < a.steps:
+                wait_interval(
+                    started, settings.interval_seconds, out / "STOP", a.fast
+                )
     except KeyboardInterrupt:
         print("Stopped; run state preserved.", flush=True)
     except Exception as e:
