@@ -74,7 +74,10 @@ def main():
     if a.command == "status":
         import sqlite3
 
-        db = sqlite3.connect(f"file:{a.out / 'ledger.sqlite'}?mode=ro", uri=True)
+        ledger_path = a.out / "ledger.sqlite"
+        if not ledger_path.is_file():
+            raise SystemExit(f"No ledger at {ledger_path}")
+        db = sqlite3.connect(f"file:{ledger_path}?mode=ro", uri=True)
         meta = {k: json.loads(v) for k, v in db.execute("SELECT key,value FROM meta")}
         print(
             json.dumps(
