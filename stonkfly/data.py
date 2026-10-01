@@ -23,7 +23,12 @@ def sha(path):
 
 def verify():
     lock = json.loads((PACKAGE / "sources.lock.json").read_text())
-    if sha(DATA / "annotations.feather") != lock["annotations.feather"]["sha256"]:
+    annotations = DATA / "annotations.feather"
+    if not annotations.exists():
+        raise RuntimeError("Annotation source missing; run prepare")
+    if not GRAPH.exists():
+        raise RuntimeError("Prepared graph missing; run prepare")
+    if sha(annotations) != lock["annotations.feather"]["sha256"]:
         raise RuntimeError("Annotation checksum mismatch")
     expected = json.loads((PACKAGE / "arrays.lock.json").read_text())
     with np.load(GRAPH, allow_pickle=False) as a:
