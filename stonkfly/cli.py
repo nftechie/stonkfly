@@ -14,6 +14,15 @@ from pathlib import Path
 from .config import D, Settings
 
 
+def restore_checkpoint(controller, out, cp):
+    path = out / cp["file"]
+    if not path.is_file():
+        raise RuntimeError("Checkpoint file missing")
+    if hashlib.sha256(path.read_bytes()).hexdigest() != cp["sha256"]:
+        raise RuntimeError("Checkpoint integrity mismatch")
+    controller.restore(path)
+
+
 def main():
     p = argparse.ArgumentParser(prog="stonkfly")
     sub = p.add_subparsers(dest="command", required=True)
@@ -159,10 +168,7 @@ def main():
         controller = FlyController(settings)
         cp = ledger.get("checkpoint")
         if cp:
-            path = out / cp["file"]
-            if hashlib.sha256(path.read_bytes()).hexdigest() != cp["sha256"]:
-                raise RuntimeError("Checkpoint integrity mismatch")
-            controller.restore(path)
+            restore_checkpoint(controller, out, cp)
         provenance = {
             "settings": dataclasses.asdict(settings),
             "dataset": verified,
