@@ -71,6 +71,8 @@ def prepare(reuse=None):
             / "normalized/neurons.feather",
         }
         for source, target in mapping.items():
+            if not source.is_file():
+                raise RuntimeError("Missing reuse source: " + str(source))
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
     else:
